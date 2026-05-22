@@ -9,24 +9,16 @@ const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
 import bodyParser from "body-parser";
 import { extractGitHubPRInfo } from "./utils/extractGitHubPRInfo.js";
+import apiRoutes from "./routes/index.js";
+import { errorHandler, notFoundHandler } from "./middlewares/errors.js";
+import { env } from "./config/env.js";
+import { startWorkers } from "./workers/index.js";
 
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 
 const RECLAIM_ID = process.env.RECLAIM_ID;
 const RECLAIM_SECRET = process.env.RECLAIM_SECRET;
-
-if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) {
-  console.error("Missing GitHub credentials");
-  process.exit(1);
-}
-
-if (!RECLAIM_ID || !RECLAIM_SECRET) {
-  console.error("Missing Reclaim credentials");
-  process.exit(1);
-}
-
-const PORT = process.env.PORT || 5000;
 
 const app = express();
 
@@ -35,7 +27,10 @@ app.use(bodyParser.json());
 app.use(express.json());
 
 app.get("/getAccessToken", async (req, res) => {
-  console.log(req.query.code);
+  if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) {
+    return res.status(500).json({ message: "GitHub OAuth credentials are not configured" });
+  }
+
   const params = `?client_id=${GITHUB_CLIENT_ID}&client_secret=${GITHUB_CLIENT_SECRET}&code=${req.query.code}`;
   await fetch("https://github.com/login/oauth/access_token" + params, {
     method: "POST",
@@ -47,13 +42,16 @@ app.get("/getAccessToken", async (req, res) => {
       return response.json();
     })
     .then((data) => {
-      console.log("/getAccessToken", data);
       res.status(200).json(data);
     });
 });
 
 app.get("/generate-proof", async (req, res) => {
   try {
+    if (!RECLAIM_ID || !RECLAIM_SECRET) {
+      return res.status(500).json({ message: "Reclaim credentials are not configured" });
+    }
+
     const client = new ReclaimClient(
       process.env.RECLAIM_ID,
       process.env.RECLAIM_SECRET,
@@ -154,6 +152,15 @@ app.get("/generate-proof", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+app.use("/api", apiRoutes);
+
+app.use(notFoundHandler);
+app.use(errorHandler);
+
+if (env.startWorkers) {
+  startWorkers();
+}
+
+app.listen(env.port, () => {
+  console.log(`Server is running on port ${env.port}`);
 });

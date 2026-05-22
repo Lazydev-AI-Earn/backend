@@ -1,0 +1,429 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  PROJECT_OWNER
+  ADMIN
+}
+
+enum BountyCategory {
+  DEVELOPMENT
+  RESEARCH
+  CONTENT
+  TRANSLATION
+  QA_TESTING
+  COMMUNITY
+  DESIGN
+  DATA
+  WEB3_ANALYSIS
+}
+
+enum BountyStatus {
+  DRAFT
+  OPEN
+  IN_PROGRESS
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+  EXPIRED
+}
+
+enum AgentCategory {
+  CORE
+  RESEARCH
+  CONTENT
+  TRANSLATION
+  QA
+  WEB3_ANALYSIS
+  DEVELOPMENT
+  SUBMISSION
+}
+
+enum AgentType {
+  ANALYZER
+  SOLVER
+  REVIEWER
+  REVISION
+  SUBMITTER
+  BUILDER
+}
+
+enum RentalMode {
+  ANALYZE_ONLY
+  SOLVE_DRAFT
+  SOLVE_REVIEW
+  AUTO_SUBMIT
+}
+
+enum RentalStatus {
+  CREATED
+  PAYMENT_PENDING
+  PAID
+  ANALYZING
+  SOLVING
+  BUILDING_SUBMISSION
+  REVIEWING
+  REVISING
+  READY_TO_SUBMIT
+  SUBMITTED
+  FAILED
+  CANCELLED
+  NEEDS_MANUAL_REVIEW
+}
+
+enum AgentRunStep {
+  ANALYZE
+  SOLVE
+  BUILD_SUBMISSION
+  REVIEW
+  REVISE
+  SUBMIT
+  CONSUME
+}
+
+enum AgentRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum SubmissionStatus {
+  DRAFT
+  AUTO_REVIEWED
+  SUBMITTED
+  APPROVED
+  REJECTED
+  REVISION_NEEDED
+}
+
+enum PaymentType {
+  AGENT_RENTAL
+  BOUNTY_REWARD
+  PLATFORM_FEE
+  CREDIT_PURCHASE
+  AGENT_CONSUME
+  CREATOR_PAYOUT
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  REFUNDED
+}
+
+enum ReviewStatus {
+  PASSED
+  NEEDS_REVISION
+  FAILED
+}
+
+model User {
+  id              String   @id @default(uuid())
+  walletAddress   String   @unique
+  username        String?
+  email           String?
+  role            UserRole @default(USER)
+  reputationScore Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([role])
+}
+
+model Bounty {
+  id               String         @id @default(uuid())
+  chainBountyId    String?
+  creatorWallet    String
+  title            String
+  description      String         @db.Text
+  category         BountyCategory
+  requirements     Json
+  submissionFormat String?
+  rewardAmount     Decimal        @db.Decimal(36, 18)
+  rewardToken      String?
+  deadline         DateTime?
+  status           BountyStatus   @default(OPEN)
+  metadataUri      String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  rentals     AgentRental[]
+  submissions Submission[]
+  payments    Payment[]
+
+  @@index([creatorWallet])
+  @@index([category, status])
+  @@index([rewardAmount])
+}
+
+model Agent {
+  id            String        @id @default(uuid())
+  chainAgentId  String?
+  creatorWallet String?
+  aiProvider    String        @default("openai")
+  name          String
+  slug          String        @unique
+  description   String        @db.Text
+  category      AgentCategory
+  agentType     AgentType
+  systemPrompt  String        @db.Text
+  model         String?
+  price         Decimal       @db.Decimal(36, 18)
+  paymentToken  String?
+  isOfficial    Boolean       @default(true)
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  rentals AgentRental[]
+
+  @@index([creatorWallet])
+  @@index([category, agentType])
+  @@index([isOfficial, isActive])
+}
+
+model AgentRental {
+  id                String       @id @default(uuid())
+  chainRentalId     String?
+  bountyId          String
+  agentId           String
+  userWallet        String
+  mode              RentalMode
+  status            RentalStatus @default(CREATED)
+  paymentTxHash     String?
+  autoSubmitEnabled Boolean      @default(false)
+  reviewScore       Int?
+  revisionAttempts  Int          @default(0)
+  finalOutput       Json?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  bounty      Bounty         @relation(fields: [bountyId], references: [id])
+  agent       Agent          @relation(fields: [agentId], references: [id])
+  runs        AgentRun[]
+  submissions Submission[]
+  payments    Payment[]
+  reviews     ReviewResult[]
+
+  @@index([userWallet])
+  @@index([bountyId])
+  @@index([agentId])
+  @@index([status])
+}
+
+model AgentRun {
+  id           String         @id @default(uuid())
+  rentalId     String
+  step         AgentRunStep
+  status       AgentRunStatus @default(PENDING)
+  inputJson    Json?
+  outputJson   Json?
+  score        Int?
+  errorMessage String?
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  rental AgentRental @relation(fields: [rentalId], references: [id])
+
+  @@index([rentalId, step])
+  @@index([status])
+}
+
+model Submission {
+  id            String           @id @default(uuid())
+  bountyId      String
+  rentalId      String?
+  userWallet    String
+  content       String           @db.Text
+  proofUrl      String?
+  contentHash   String?
+  status        SubmissionStatus @default(SUBMITTED)
+  reviewScore   Int?
+  autoSubmitted Boolean          @default(false)
+  submittedAt   DateTime?
+  approvedAt    DateTime?
+  rejectedAt    DateTime?
+  txHash        String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  bounty  Bounty         @relation(fields: [bountyId], references: [id])
+  rental  AgentRental?   @relation(fields: [rentalId], references: [id])
+  reviews ReviewResult[]
+
+  @@index([bountyId])
+  @@index([rentalId])
+  @@index([userWallet])
+  @@index([status])
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  userWallet      String
+  type            PaymentType
+  amount          Decimal       @db.Decimal(36, 18)
+  tokenAddress    String?
+  txHash          String?
+  status          PaymentStatus @default(PENDING)
+  relatedBountyId String?
+  relatedRentalId String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  bounty Bounty?      @relation(fields: [relatedBountyId], references: [id])
+  rental AgentRental? @relation(fields: [relatedRentalId], references: [id])
+
+  @@index([userWallet])
+  @@index([status])
+  @@index([relatedBountyId])
+  @@index([relatedRentalId])
+}
+
+model ReviewResult {
+  id                  String       @id @default(uuid())
+  rentalId            String?
+  submissionId        String?
+  score               Int
+  status              ReviewStatus
+  missingRequirements Json
+  qualityIssues       Json
+  recommendations     Json
+  readyToSubmit       Boolean
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  rental     AgentRental? @relation(fields: [rentalId], references: [id])
+  submission Submission?  @relation(fields: [submissionId], references: [id])
+
+  @@index([rentalId])
+  @@index([submissionId])
+  @@index([status])
+}
+
+model Nonce {
+  id            String   @id @default(uuid())
+  walletAddress String
+  nonce         String
+  message       String   @db.Text
+  used          Boolean  @default(false)
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+
+  @@index([walletAddress, used])
+  @@index([expiresAt])
+}
+
+model CreditBalance {
+  id             String   @id @default(uuid())
+  userWallet     String   @unique
+  balanceCredits Decimal  @default(0) @db.Decimal(36, 18)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userWallet])
+}
+
+model CreditLedger {
+  id                   String        @id @default(uuid())
+  userWallet           String
+  type                 String
+  amountCredits        Decimal       @db.Decimal(36, 18)
+  amountUsd            Decimal?      @db.Decimal(36, 18)
+  status               PaymentStatus @default(CONFIRMED)
+  txHash               String?
+  metadata             Json?
+  relatedRentalId      String?
+  relatedAgentId       String?
+  relatedConsumptionId String?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  @@index([userWallet])
+  @@index([type])
+  @@index([status])
+  @@index([relatedRentalId])
+  @@index([relatedConsumptionId])
+}
+
+model AgentConsumption {
+  id                       String         @id @default(uuid())
+  rentalId                 String
+  agentId                  String
+  runId                    String?
+  userWallet               String
+  provider                 String
+  model                    String
+  inputTokens              Int            @default(0)
+  cachedInputTokens        Int            @default(0)
+  outputTokens             Int            @default(0)
+  inputUsdPerMillion       Decimal        @default(0) @db.Decimal(36, 18)
+  cachedInputUsdPerMillion Decimal        @default(0) @db.Decimal(36, 18)
+  outputUsdPerMillion      Decimal        @default(0) @db.Decimal(36, 18)
+  aiCostUsd                Decimal        @default(0) @db.Decimal(36, 18)
+  aiCostCredits            Decimal        @default(0) @db.Decimal(36, 18)
+  chargedCredits           Decimal        @default(0) @db.Decimal(36, 18)
+  creatorPayoutCredits     Decimal        @default(0) @db.Decimal(36, 18)
+  platformFeeCredits       Decimal        @default(0) @db.Decimal(36, 18)
+  usageSource              String         @default("estimated")
+  pricingSource            String         @default("fallback")
+  rawUsage                 Json?
+  status                   AgentRunStatus @default(PENDING)
+  errorMessage             String?
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
+
+  @@index([rentalId])
+  @@index([agentId])
+  @@index([runId])
+  @@index([userWallet])
+  @@index([status])
+  @@index([provider, model])
+}
+
+model CreatorPayout {
+  id                   String   @id @default(uuid())
+  creatorWallet        String
+  amountCredits        Decimal  @db.Decimal(36, 18)
+  amountUsd            Decimal? @db.Decimal(36, 18)
+  tokenAddress         String?
+  txHash               String?
+  status               String   @default("PENDING")
+  relatedConsumptionId String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([creatorWallet])
+  @@index([status])
+  @@index([relatedConsumptionId])
+}
+
+model AiModelPricing {
+  id                       String   @id @default(uuid())
+  provider                 String
+  model                    String
+  inputUsdPerMillion       Decimal  @db.Decimal(36, 18)
+  cachedInputUsdPerMillion Decimal? @db.Decimal(36, 18)
+  outputUsdPerMillion      Decimal  @db.Decimal(36, 18)
+  sourceUrl                String?
+  sourceNote               String?
+  isActive                 Boolean  @default(true)
+  effectiveAt              DateTime @default(now())
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@unique([provider, model])
+  @@index([provider])
+  @@index([isActive])
+}
