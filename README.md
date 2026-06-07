@@ -323,3 +323,4 @@ For example, a custom `SOLVER` agent drives the solve step. Official analyzer, b
 <!-- docs improvement 1 3C53831A-9FFA-4DAA-80D7-41BAC3CD5D19 -->
 <!-- docs improvement 2 ED916634-ACEC-4CD7-8199-EC1F1DE22D91 -->
 <!-- docs improvement 3 CA0DAE72-8F88-45A9-83EA-EB8CA45C74EF -->
+<!-- docs improvement 4 A583BC82-F0FC-4747-A870-D1EEAC22156F -->
