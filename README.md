@@ -1,22 +1,22 @@
-# wearelazydev Backend
+# lazydev Backend
 
-Express ESM backend for wearelazydev. It supports the existing GitHub OAuth and Reclaim zkTLS proof endpoints, plus the backend foundation for bounties, official AI agents, agent rentals, review pipeline, submissions, payments, and Celo-first blockchain placeholders.
+Express ESM TypeScript backend for lazydev. It supports the existing GitHub OAuth and Reclaim zkTLS proof endpoints, plus the backend foundation for bounties, official AI agents, agent rentals, review pipeline, submissions, payments, and Celo-first blockchain placeholders.
 
 ## Requirements
 
 - Node.js 20 LTS
 - PostgreSQL, installed locally
 - Redis, installed locally
-- npm
+- pnpm
 
 ## Local Setup
 
 ```sh
 cp .env.example .env
-npm install
-npx prisma migrate dev
-npx prisma db seed
-npm run dev
+pnpm install
+pnpm prisma migrate dev
+pnpm prisma db seed
+pnpm dev
 ```
 
 If PostgreSQL or Redis is not running yet on macOS with Homebrew:
@@ -25,13 +25,13 @@ If PostgreSQL or Redis is not running yet on macOS with Homebrew:
 brew install postgresql@14 redis
 brew services start postgresql@14
 brew services start redis
-createdb wearelazydev
+createdb lazydev
 ```
 
 Then keep this default database URL in `.env`, or adjust it to your local PostgreSQL user and password:
 
 ```env
-DATABASE_URL=postgresql://wearelazydev:wearelazydev@localhost:5432/wearelazydev?schema=public
+DATABASE_URL=postgresql://lazydev:lazydev@localhost:5432/lazydev?schema=public
 REDIS_URL=redis://localhost:6379
 ```
 
@@ -51,31 +51,35 @@ GET /generate-proof
 ## Core Commands
 
 ```sh
-npm run dev
-npm run worker
-npm run build
-npm run lint
-npx prisma migrate dev
-npx prisma db seed
+pnpm dev
+pnpm worker
+pnpm build
+pnpm lint
+pnpm prisma migrate dev
+pnpm prisma db seed
 ```
 
-`npm run dev` starts the HTTP server. By default it also starts BullMQ workers when `START_WORKERS=true`.
+`pnpm dev` starts the HTTP server from TypeScript. By default it also starts BullMQ workers when `START_WORKERS=true`.
 
 ## Environment
 
 Important local variables:
 
 ```env
-DATABASE_URL=postgresql://wearelazydev:wearelazydev@localhost:5432/wearelazydev?schema=public
+DATABASE_URL=postgresql://lazydev:lazydev@localhost:5432/lazydev?schema=public
 REDIS_URL=redis://localhost:6379
 JWT_SECRET=replace-with-a-long-random-secret
 MOCK_AI=true
-MOCK_PAYMENTS=true
+MOCK_PAYMENTS=false
+AGENT_API_KEY_ENCRYPTION_SECRET=replace-with-a-long-random-secret
 CELO_CHAIN_ID=42220
 RPC_URL=
 BOUNTY_CONTRACT_ADDRESS=
+AGENT_REGISTRY_CONTRACT_ADDRESS=
 AGENT_RENTAL_CONTRACT_ADDRESS=
 TREASURY_ADDRESS=
+PINATA_JWT=
+PINATA_GATEWAY_URL=
 ```
 
 Do not hardcode Celo contract addresses in source. Set contract addresses through env when contracts exist. `CELO_CHAIN_ID=42220` is Celo Mainnet. Use `11142220` for Celo Sepolia.
@@ -109,11 +113,13 @@ Authorization: Bearer <token>
 ```txt
 GET    /api/me
 POST   /api/bounties
+POST   /api/bounties/prepare
 GET    /api/bounties
 GET    /api/bounties/:id
 PATCH  /api/bounties/:id
 POST   /api/bounties/:id/approve-submission/:submissionId
 POST   /api/bounties/:id/reject-submission/:submissionId
+GET    /api/users/:wallet/bounties
 
 GET    /api/agents
 POST   /api/agents
@@ -127,6 +133,7 @@ POST   /api/agent-rentals
 GET    /api/agent-rentals/:id
 GET    /api/users/:wallet/rentals
 POST   /api/agent-rentals/:id/start
+POST   /api/agent-rentals/:id/resume
 POST   /api/agent-rentals/:id/cancel
 POST   /api/agent-rentals/:id/consume
 GET    /api/agent-rentals/:id/consumptions
@@ -143,6 +150,7 @@ GET    /api/reviews/:id
 GET    /api/payments
 GET    /api/billing/business-model
 GET    /api/billing/ai-pricing
+GET    /api/billing/solve-estimate
 GET    /api/billing/me
 GET    /api/billing/consumptions
 GET    /api/users/:wallet/creator-payouts
@@ -177,7 +185,7 @@ With:
 
 ```env
 MOCK_AI=true
-MOCK_PAYMENTS=true
+MOCK_PAYMENTS=false
 START_WORKERS=true
 ```
 
@@ -200,7 +208,29 @@ curl -X POST http://localhost:5050/api/agent-rentals/<rental-id>/consume \
   -d '{"input":"Create a draft answer for this bounty","context":{"format":"markdown"}}'
 ```
 
-Consumption creates an `AgentRun` with step `CONSUME`, calls the rented agent with its `SKILL.md` or fallback `systemPrompt`, stores provider token usage and a price snapshot in `AgentConsumption`, debits renter credits, and accrues creator payout for user-created agents.
+Direct agent consumption creates an `AgentRun` with step `CONSUME`, calls the rented agent with its `SKILL.md` or fallback `systemPrompt`, stores provider token usage and a price snapshot in `AgentConsumption`, debits renter credits, and accrues creator payout for user-created agents.
+
+Solve-bounty worker steps are billable checkpoints. `ANALYZE`, `SOLVE`, `BUILD_SUBMISSION`, `REVIEW`, and `REVISE` each check credits, store usage in `AgentConsumption`, debit `CreditLedger`, and pause the solve job as `CREDITS_REQUIRED` if the user needs to top up. After a successful MiniPay credit purchase, call `POST /api/agent-rentals/:id/resume` to enqueue the next unfinished step instead of restarting the whole solve flow.
+
+Estimate solve-bounty credits before starting a solve job:
+
+```sh
+curl "http://localhost:5050/api/billing/solve-estimate?mode=SOLVE_REVIEW&provider=openai&model=gpt-5.4-nano"
+```
+
+Use `provider=anthropic&model=claude-sonnet-4-6` to preview the Claude cost path for an agent configured with Claude. The estimate returns `expected`, `withOneRevision`, and `worstCase` totals. It is calculated per pipeline step, so the minimum consume charge can apply multiple times in one solve flow.
+
+Starting a solve-bounty job references the selected agent. Provider and model stay on the agent record:
+
+```json
+{
+  "bountyId": "<bounty-id>",
+  "agentId": "<agent-id>",
+  "mode": "SOLVE_REVIEW"
+}
+```
+
+Create or update the agent with `aiProvider` (`openai`, `openai-compatible`, or `anthropic`) and `model` to choose the execution path. The solve worker uses the agent configuration instead of a bounty-level provider override.
 
 Credit purchases for MiniPay-compatible stablecoin flows:
 
@@ -211,7 +241,7 @@ curl -X POST http://localhost:5050/api/minipay/credit-purchases \
   -d '{"amountCredits":"500","tokenSymbol":"USDC"}'
 ```
 
-With `MOCK_PAYMENTS=true`, the purchase credits the renter immediately. With `MOCK_PAYMENTS=false`, pass a Celo payment `txHash` and wire final verification to the deployed payment contract.
+With `MOCK_PAYMENTS=false`, pass a Celo payment `txHash`; the backend verifies the receipt, token transfer, sender, recipient, amount, and contract event before crediting. `MOCK_PAYMENTS=true` is only a local development escape hatch.
 
 Business model defaults:
 
@@ -222,7 +252,7 @@ creator share = 60% of net revenue
 platform share = remaining net revenue after AI cost and creator payout
 ```
 
-OpenAI and Claude are both supported through `aiProvider` on agents. Supported values are `openai`, `openai-compatible`, and `anthropic`.
+OpenAI and Claude are both supported through `aiProvider` on agents. Supported values are `openai`, `openai-compatible`, and `anthropic`; the companion `model` field stores the exact model selected at create-agent time.
 
 AI pricing is seeded into `AiModelPricing` from official OpenAI and Claude API pricing pages. Admins can update it through `/api/admin/ai-pricing`. `AI_PRICING_JSON` is an emergency environment override and wins over database pricing. When `MOCK_AI=false`, consumption billing uses real provider usage fields from OpenAI or Anthropic responses. When `MOCK_AI=true`, billing falls back to deterministic token estimates for local development.
 
@@ -245,8 +275,9 @@ agents/skills/auto-review/SKILL.md
 The AI pipeline prefers the matching `SKILL.md` file. If no skill file exists, it falls back to the agent `systemPrompt` stored in the database. Admin-created agents can use the same convention by adding `agents/skills/<new-agent-slug>/SKILL.md`.
 
 Public agent endpoints expose only `hasSkill`. They never return raw `SKILL.md` content or `systemPrompt`.
+When an agent has a per-agent API key, public endpoints expose only `hasApiKey` and `apiKeyLast4`.
 
-Authenticated users can create public rentable agents. Use multipart form data when uploading a skill file:
+Authenticated users can create public rentable agents. Use multipart form data when uploading skill files:
 
 ```sh
 curl -X POST http://localhost:5050/api/agents \
@@ -257,11 +288,15 @@ curl -X POST http://localhost:5050/api/agents \
   -F "category=RESEARCH" \
   -F "agentType=SOLVER" \
   -F "systemPrompt=You are my custom research agent. Return structured JSON only." \
-  -F "price=0" \
-  -F "skill=@./SKILL.md;filename=SKILL.md;type=text/markdown"
+  -F "aiProvider=anthropic" \
+  -F "apiKey=sk-ant-..." \
+  -F "skills=@./strategy.md;type=text/markdown" \
+  -F "skills=@./review-checklist.md;type=text/markdown"
 ```
 
-The uploaded file must be named `SKILL.md` and must be 64 KB or smaller. User-created agents are public and rentable immediately. The creator or an admin can update the agent, replace its skill file, or disable it.
+Uploaded skill files must be markdown files. Each file must be 64 KB or smaller, and the combined upload must be 256 KB or smaller. The backend bundles uploaded files into the runtime `agents/skills/<agent-slug>/SKILL.md` file. User-created agents are public and rentable immediately. The creator or an admin can update the agent, replace its skill bundle, or disable it.
+Per-agent API keys are encrypted at rest using `AGENT_API_KEY_ENCRYPTION_SECRET`, used only for that agent's provider calls, and never returned by API responses.
+User-created agents do not set a fixed rental price in the create flow. Direct agent access uses pay-as-you-go consumption billing.
 
 Users can solve a bounty with their own custom agent:
 
@@ -285,3 +320,4 @@ For example, a custom `SOLVER` agent drives the solve step. Official analyzer, b
 - Admin mutation routes require `ADMIN`.
 - AI output is sanitized before storage as final submission content.
 - Auto-submit fails closed for high-risk tasks, low scores, missing final output, wallet actions, external account posting, and weak content.
+<!-- docs improvement 1 3C53831A-9FFA-4DAA-80D7-41BAC3CD5D19 -->
