@@ -322,3 +322,4 @@ For example, a custom `SOLVER` agent drives the solve step. Official analyzer, b
 - Auto-submit fails closed for high-risk tasks, low scores, missing final output, wallet actions, external account posting, and weak content.
 <!-- docs improvement 1 3C53831A-9FFA-4DAA-80D7-41BAC3CD5D19 -->
 <!-- docs improvement 2 ED916634-ACEC-4CD7-8199-EC1F1DE22D91 -->
+<!-- docs improvement 3 CA0DAE72-8F88-45A9-83EA-EB8CA45C74EF -->
