@@ -32,16 +32,22 @@ export const optionalFutureDate = z
     message: "Deadline must be in the future",
   });
 
+function parseBoundedInteger(value, fallback, { min, max }) {
+  const parsed = Number.parseInt(String(value ?? fallback), 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
 export function paginationQuery() {
   return z.object({
     page: z
       .string()
       .optional()
-      .transform((value) => Math.max(1, Number(value || 1))),
+      .transform((value) => parseBoundedInteger(value, 1, { min: 1, max: Number.MAX_SAFE_INTEGER })),
     limit: z
       .string()
       .optional()
-      .transform((value) => Math.min(100, Math.max(1, Number(value || 20)))),
+      .transform((value) => parseBoundedInteger(value, 20, { min: 1, max: 100 })),
   });
 }
 

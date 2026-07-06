@@ -9,7 +9,8 @@
     "dev": "nodemon server.js",
     "worker": "node workers/index.js",
     "build": "node --check server.js",
-    "lint": "node scripts/check-syntax.js"
+    "lint": "node scripts/check-syntax.js",
+    "test": "node --test"
   },
   "author": "Andreas Sibua",
   "license": "ISC",
