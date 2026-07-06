@@ -55,6 +55,7 @@ npm run dev
 npm run worker
 npm run build
 npm run lint
+npm test
 npx prisma migrate dev
 npx prisma db seed
 ```
