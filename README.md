@@ -1,22 +1,22 @@
 # lazydev Backend
 
-Express ESM TypeScript backend for lazydev. It supports the existing GitHub OAuth and Reclaim zkTLS proof endpoints, plus the backend foundation for bounties, official AI agents, agent rentals, review pipeline, submissions, payments, and Celo-first blockchain placeholders.
+Express ESM backend for lazydev. It supports the existing GitHub OAuth and Reclaim zkTLS proof endpoints, plus the backend foundation for bounties, official AI agents, agent rentals, review pipeline, submissions, payments, and Celo-first blockchain placeholders.
 
 ## Requirements
 
 - Node.js 20 LTS
 - PostgreSQL, installed locally
 - Redis, installed locally
-- pnpm
+- npm
 
 ## Local Setup
 
 ```sh
 cp .env.example .env
-pnpm install
-pnpm prisma migrate dev
-pnpm prisma db seed
-pnpm dev
+npm install
+npx prisma migrate dev
+npx prisma db seed
+npm run dev
 ```
 
 If PostgreSQL or Redis is not running yet on macOS with Homebrew:
@@ -51,15 +51,15 @@ GET /generate-proof
 ## Core Commands
 
 ```sh
-pnpm dev
-pnpm worker
-pnpm build
-pnpm lint
-pnpm prisma migrate dev
-pnpm prisma db seed
+npm run dev
+npm run worker
+npm run build
+npm run lint
+npx prisma migrate dev
+npx prisma db seed
 ```
 
-`pnpm dev` starts the HTTP server from TypeScript. By default it also starts BullMQ workers when `START_WORKERS=true`.
+`npm run dev` starts the HTTP server from `server.js`. By default it also starts BullMQ workers when `START_WORKERS=true`.
 
 ## Environment
 
