@@ -33,15 +33,20 @@ export const optionalFutureDate = z
   });
 
 export function paginationQuery() {
+  const parsePage = (value) => {
+    const parsed = Number.parseInt(value ?? "1", 10);
+    return Number.isFinite(parsed) ? Math.max(1, parsed) : 1;
+  };
+
+  const parseLimit = (value) => {
+    const parsed = Number.parseInt(value ?? "20", 10);
+    if (!Number.isFinite(parsed)) return 20;
+    return Math.min(100, Math.max(1, parsed));
+  };
+
   return z.object({
-    page: z
-      .string()
-      .optional()
-      .transform((value) => Math.max(1, Number(value || 1))),
-    limit: z
-      .string()
-      .optional()
-      .transform((value) => Math.min(100, Math.max(1, Number(value || 20)))),
+    page: z.string().optional().transform(parsePage),
+    limit: z.string().optional().transform(parseLimit),
   });
 }
 
