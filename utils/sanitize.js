@@ -5,6 +5,7 @@ export function sanitizeText(value) {
     .replace(/<iframe[\s\S]*?>[\s\S]*?<\/iframe>/gi, "")
     .replace(/\son\w+="[^"]*"/gi, "")
     .replace(/\son\w+='[^']*'/gi, "")
+    .replace(/\son\w+=([^\s>]+)/gi, "")
     .trim();
 }
 
