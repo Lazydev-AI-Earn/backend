@@ -1,9 +1,13 @@
 export function extractGitHubPRInfo(url) {
-  // Menghapus "https://github.com/" dari awal URL
-  const withoutPrefix = url.replace("https://github.com/", "");
+  const parsedUrl = new URL(String(url));
+  if (parsedUrl.hostname !== "github.com") {
+    throw new Error("Invalid GitHub pull request URL");
+  }
 
-  // Memisahkan string berdasarkan '/'
-  const parts = withoutPrefix.split("/");
+  const parts = parsedUrl.pathname.split("/").filter(Boolean);
+  if (parts.length < 4 || parts[2] !== "pull" || !/^\d+$/.test(parts[3])) {
+    throw new Error("Invalid GitHub pull request URL");
+  }
 
   return {
     owner: parts[0],
