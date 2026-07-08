@@ -59,6 +59,10 @@ app.get("/generate-proof", async (req, res) => {
     );
 
     const urlPullRequest = req.query.url;
+    if (!urlPullRequest) {
+      return res.status(400).json({ message: "Missing GitHub pull request URL" });
+    }
+
     const { owner, repo, pull_number } = extractGitHubPRInfo(urlPullRequest);
 
     const publicOptions = {
@@ -147,6 +151,10 @@ app.get("/generate-proof", async (req, res) => {
 
     res.status(200).json({ prProofData, userProofData });
   } catch (error) {
+    if (error.message === "Invalid GitHub pull request URL") {
+      return res.status(400).json({ message: error.message });
+    }
+
     console.error(error);
     res.status(500).json({ error: error.message });
   }
