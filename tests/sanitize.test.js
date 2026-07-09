@@ -19,3 +19,11 @@ test("sanitizeJson sanitizes nested string fields", () => {
     nested: ["<button>Run</button>"],
   });
 });
+
+test("sanitizeText removes javascript urls from links and media", () => {
+  const sanitized = sanitizeText(
+    '<a href="javascript:alert(1)">Open</a><img src=" JAVASCRIPT:alert(2) " alt="demo">'
+  );
+
+  assert.equal(sanitized, '<a>Open</a><img alt="demo">');
+});
