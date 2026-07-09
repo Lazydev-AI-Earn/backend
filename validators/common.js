@@ -5,6 +5,7 @@ export const uuidSchema = z.string().uuid();
 
 export const walletSchema = z
   .string()
+  .trim()
   .refine((value) => isAddress(value), "Invalid wallet address")
   .transform((value) => value.toLowerCase());
 
@@ -15,13 +16,13 @@ export const txHashSchema = z
 
 export const positiveDecimalString = z
   .union([z.string(), z.number()])
-  .transform((value) => String(value))
+  .transform((value) => String(value).trim())
   .refine((value) => /^\d+(\.\d+)?$/.test(value), "Must be a positive decimal")
   .refine((value) => Number(value) > 0, "Must be greater than zero");
 
 export const nonNegativeDecimalString = z
   .union([z.string(), z.number()])
-  .transform((value) => String(value))
+  .transform((value) => String(value).trim())
   .refine((value) => /^\d+(\.\d+)?$/.test(value), "Must be a non-negative decimal");
 
 export const optionalFutureDate = z
