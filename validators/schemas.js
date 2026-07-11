@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sanitizeText } from "../utils/sanitize.js";
 import {
   optionalFutureDate,
   nonNegativeDecimalString,
@@ -8,6 +9,15 @@ import {
   uuidSchema,
   walletSchema,
 } from "./common.js";
+
+function sanitizedTextField({ min, max, emptyMessage }) {
+  return z
+    .string()
+    .trim()
+    .max(max)
+    .transform((value) => sanitizeText(value))
+    .refine((value) => value.length >= min, emptyMessage);
+}
 
 export const authNonceQuerySchema = z.object({
   wallet: walletSchema,
@@ -63,14 +73,22 @@ export const agentRentalCreateSchema = z.object({
 });
 
 export const agentConsumeSchema = z.object({
-  input: z.string().trim().min(1).max(20000),
+  input: sanitizedTextField({
+    min: 1,
+    max: 20000,
+    emptyMessage: "Input must include meaningful text",
+  }),
   context: z.record(z.any()).optional().default({}),
 });
 
 export const submissionCreateSchema = z.object({
   bountyId: uuidSchema,
   rentalId: uuidSchema.optional(),
-  content: z.string().trim().min(10).max(50000),
+  content: sanitizedTextField({
+    min: 10,
+    max: 50000,
+    emptyMessage: "Content must include meaningful text",
+  }),
   proofUrl: z.string().trim().url().optional(),
 });
 
