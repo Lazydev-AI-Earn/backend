@@ -34,7 +34,10 @@ export const optionalFutureDate = z
   });
 
 function parseBoundedInteger(value, fallback, { min, max }) {
-  const parsed = Number.parseInt(String(value ?? fallback), 10);
+  const rawValue = String(value ?? fallback).trim();
+  if (!/^\d+$/.test(rawValue)) return fallback;
+
+  const parsed = Number(rawValue);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(max, Math.max(min, parsed));
 }
