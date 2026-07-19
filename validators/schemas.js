@@ -10,6 +10,29 @@ import {
   walletSchema,
 } from "./common.js";
 
+const bountyCategorySchema = z.enum([
+  "DEVELOPMENT",
+  "RESEARCH",
+  "CONTENT",
+  "TRANSLATION",
+  "QA_TESTING",
+  "COMMUNITY",
+  "DESIGN",
+  "DATA",
+  "WEB3_ANALYSIS",
+]);
+
+const bountyStatusSchema = z.enum([
+  "DRAFT",
+  "OPEN",
+  "IN_PROGRESS",
+  "SUBMITTED",
+  "APPROVED",
+  "REJECTED",
+  "CANCELLED",
+  "EXPIRED",
+]);
+
 function sanitizedTextField({ min, max, emptyMessage }) {
   return z
     .string()
@@ -31,17 +54,7 @@ export const authVerifySchema = z.object({
 export const bountyCreateSchema = z.object({
   title: z.string().trim().min(4).max(160),
   description: z.string().trim().min(20).max(20000),
-  category: z.enum([
-    "DEVELOPMENT",
-    "RESEARCH",
-    "CONTENT",
-    "TRANSLATION",
-    "QA_TESTING",
-    "COMMUNITY",
-    "DESIGN",
-    "DATA",
-    "WEB3_ANALYSIS",
-  ]),
+  category: bountyCategorySchema,
   requirements: z.union([z.array(z.string().trim().min(1)).min(1), z.record(z.any())]),
   submissionFormat: z.string().trim().max(500).optional(),
   rewardAmount: positiveDecimalString,
@@ -51,16 +64,14 @@ export const bountyCreateSchema = z.object({
 });
 
 export const bountyUpdateSchema = bountyCreateSchema.partial().extend({
-  status: z
-    .enum(["DRAFT", "OPEN", "IN_PROGRESS", "SUBMITTED", "APPROVED", "REJECTED", "CANCELLED", "EXPIRED"])
-    .optional(),
+  status: bountyStatusSchema.optional(),
 });
 
 export const bountyListQuerySchema = paginationQuery().extend({
-  category: z.string().optional(),
-  status: z.string().optional(),
-  minReward: z.string().optional(),
-  maxReward: z.string().optional(),
+  category: bountyCategorySchema.optional(),
+  status: bountyStatusSchema.optional(),
+  minReward: nonNegativeDecimalString.optional(),
+  maxReward: nonNegativeDecimalString.optional(),
   search: z.string().trim().optional(),
 });
 

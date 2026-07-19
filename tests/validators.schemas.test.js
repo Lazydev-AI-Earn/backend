@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { agentConsumeSchema, submissionCreateSchema } from "../validators/schemas.js";
+import {
+  agentConsumeSchema,
+  bountyListQuerySchema,
+  submissionCreateSchema,
+} from "../validators/schemas.js";
 
 test("submissionCreateSchema rejects content that becomes empty after sanitization", () => {
   assert.throws(
@@ -28,5 +32,15 @@ test("agentConsumeSchema rejects input that becomes empty after sanitization", (
       error.issues.some(
         (issue) => issue.path.join(".") === "input" && issue.message === "Input must include meaningful text"
       )
+  );
+});
+
+test("bountyListQuerySchema rejects invalid enum and reward filters", () => {
+  assert.throws(() =>
+    bountyListQuerySchema.parse({
+      category: "NOT_A_CATEGORY",
+      status: "NOT_A_STATUS",
+      minReward: "not-a-number",
+    })
   );
 });
