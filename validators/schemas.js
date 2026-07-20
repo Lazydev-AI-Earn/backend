@@ -48,7 +48,7 @@ export const authNonceQuerySchema = z.object({
 
 export const authVerifySchema = z.object({
   walletAddress: walletSchema,
-  signature: z.string().regex(/^0x[a-fA-F0-9]+$/, "Invalid signature"),
+  signature: z.string().regex(/^0x[a-fA-F0-9]{130,132}$/, "Invalid signature"),
 });
 
 export const bountyCreateSchema = z.object({

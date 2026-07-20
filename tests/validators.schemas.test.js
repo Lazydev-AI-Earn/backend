@@ -1,11 +1,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  authVerifySchema,
   bountyCreateSchema,
   agentConsumeSchema,
   bountyListQuerySchema,
   submissionCreateSchema,
 } from "../validators/schemas.js";
+
+test("authVerifySchema rejects signatures with invalid byte lengths", () => {
+  assert.throws(() =>
+    authVerifySchema.parse({
+      walletAddress: "0x000000000000000000000000000000000000dEaD",
+      signature: "0xdeadbeef",
+    })
+  );
+});
 
 test("bountyCreateSchema sanitizes user-visible text fields", () => {
   const parsed = bountyCreateSchema.parse({
