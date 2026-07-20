@@ -1,10 +1,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  bountyCreateSchema,
   agentConsumeSchema,
   bountyListQuerySchema,
   submissionCreateSchema,
 } from "../validators/schemas.js";
+
+test("bountyCreateSchema sanitizes user-visible text fields", () => {
+  const parsed = bountyCreateSchema.parse({
+    title: '<img src=x onerror=alert(1)>Task',
+    description: '<script>alert("xss")</script>Describe the work in detail',
+    category: "DEVELOPMENT",
+    requirements: ["<button onclick=test()>Run tests</button>"],
+    rewardAmount: "10",
+  });
+
+  assert.equal(parsed.title, "<img src=x>Task");
+  assert.equal(parsed.description, "Describe the work in detail");
+  assert.deepEqual(parsed.requirements, ["<button>Run tests</button>"]);
+});
 
 test("submissionCreateSchema rejects content that becomes empty after sanitization", () => {
   assert.throws(
