@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { sanitizeText } from "../utils/sanitize.js";
+import { sanitizeJson, sanitizeText } from "../utils/sanitize.js";
 import {
   optionalFutureDate,
   nonNegativeDecimalString,
@@ -48,15 +48,21 @@ export const authNonceQuerySchema = z.object({
 
 export const authVerifySchema = z.object({
   walletAddress: walletSchema,
-  signature: z.string().regex(/^0x[a-fA-F0-9]+$/, "Invalid signature"),
+  signature: z.string().regex(/^0x[a-fA-F0-9]{130,132}$/, "Invalid signature"),
 });
 
 export const bountyCreateSchema = z.object({
-  title: z.string().trim().min(4).max(160),
-  description: z.string().trim().min(20).max(20000),
+  title: sanitizedTextField({ min: 4, max: 160, emptyMessage: "Title must include meaningful text" }),
+  description: sanitizedTextField({
+    min: 20,
+    max: 20000,
+    emptyMessage: "Description must include meaningful text",
+  }),
   category: bountyCategorySchema,
-  requirements: z.union([z.array(z.string().trim().min(1)).min(1), z.record(z.any())]),
-  submissionFormat: z.string().trim().max(500).optional(),
+  requirements: z
+    .union([z.array(z.string().trim().min(1)).min(1), z.record(z.any())])
+    .transform(sanitizeJson),
+  submissionFormat: z.string().trim().max(500).transform(sanitizeText).optional(),
   rewardAmount: positiveDecimalString,
   rewardToken: z.string().trim().max(80).optional(),
   deadline: optionalFutureDate,
